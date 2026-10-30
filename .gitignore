@@ -12,3 +12,6 @@ dist/
 **/data/
 *.mv.db
 *.trace.db
+
+frontend/
+

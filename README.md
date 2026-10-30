@@ -44,7 +44,6 @@ Ran on **AMD Ryzen 7 / Intel Core i7, Windows 11, OpenJDK 21.0.13**:
 Move_in_sync/
 ├── pom.xml                               # Maven parent POM (Spring Boot 3.3.5, Java 21)
 ├── DESIGN_NOTE.md                        # Architecture, Sequence Diagram, Failure-Mode Table
-├── frontend/                             # React + Vite Interactive Web Console
 ├── config-client-sdk/                    # Lightweight embeddable client library
 │   ├── src/main/java/.../client/
 │   │   ├── MoveInSyncConfigClient.java   # Public client interface
@@ -68,10 +67,9 @@ Move_in_sync/
 
 ---
 
-## Quick Start (Backend & Frontend)
+## Quick Start (Backend)
 
-### 1. Start Backend (`config-server`)
-Ensure PostgreSQL is running locally on port `5432` with a database named `moveinsync_config` (or configure via environment variables).
+Ensure PostgreSQL is running on port `5432` with a database named `moveinsync_config` (or configure connection details via environment variables).
 
 ```bash
 # Windows
@@ -80,15 +78,13 @@ Ensure PostgreSQL is running locally on port `5432` with a database named `movei
 # Linux / macOS
 ./mvnw spring-boot:run -pl config-server
 ```
-The server will start on port `8090` and auto-initialize schemas.
+The server will start on port `8090` (or `PORT` if specified) and auto-initialize schemas.
 
-### 2. Start Frontend (`frontend`)
-```bash
-cd frontend
-npm install
-npm run dev
-```
-Open `http://localhost:3000` to interact with the configuration console.
+---
+
+## Frontend Web Console
+The React + Vite frontend dashboard is maintained in its dedicated repository:
+👉 [Tenant-Config-Frontend](https://github.com/Sowmya-257/Tenant-Config-Frontend)
 
 ---
 
