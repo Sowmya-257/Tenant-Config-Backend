@@ -15,7 +15,7 @@ import ConfigDashboardPage from './components/ConfigDashboardPage';
 import EditConfigPage from './components/EditConfigPage';
 import HistoryPage from './components/HistoryPage';
 import SystemDiagnosticsPage from './components/SystemDiagnosticsPage';
-import { TENANTS } from './services/store';
+import { TENANTS, API_BASE } from './services/store';
 
 export default function App() {
   // Authentication state
@@ -76,7 +76,7 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
 
-    const streamUrl = `/api/v1/stream/${encodeURIComponent(user.tenant)}`;
+    const streamUrl = `${API_BASE}/api/v1/stream/${encodeURIComponent(user.tenant)}`;
     let eventSource;
 
     try {

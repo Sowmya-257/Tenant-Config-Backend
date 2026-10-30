@@ -1,5 +1,7 @@
 // MoveInSync Real-Time API Service — Directly Connected to Spring Boot Backend
 
+export const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+
 export const TENANTS = [
   { id: 'MICROSOFT', name: 'Microsoft India', offices: ['BLR-01', 'BLR-02', 'HYD-01', 'DEL-01'] },
   { id: 'GOOGLE', name: 'Google Workspace Corp', offices: ['BLR-01', 'HYD-01', 'MUM-01'] },
@@ -25,7 +27,7 @@ export const SHIFTS = ['MORNING', 'GENERAL', 'EVENING', 'NIGHT'];
 export const api = {
   // 1. Get all definitions from backend with validation rules
   async getDefinitions() {
-    const res = await fetch('/api/v1/definitions');
+    const res = await fetch(`${API_BASE}/api/v1/definitions`);
     if (!res.ok) {
       throw new Error(`Failed to load definitions from backend (Status: ${res.status})`);
     }
@@ -34,7 +36,7 @@ export const api = {
 
   // 2. Get active monotonic version counter for a tenant
   async getVersion(tenantId) {
-    const res = await fetch(`/api/v1/sync/version?tenantId=${encodeURIComponent(tenantId)}`);
+    const res = await fetch(`${API_BASE}/api/v1/sync/version?tenantId=${encodeURIComponent(tenantId)}`);
     if (!res.ok) {
       throw new Error(`Failed to fetch version for ${tenantId} from backend`);
     }
@@ -48,7 +50,7 @@ export const api = {
     if (officeId) params.append('officeId', officeId);
     if (shiftId) params.append('shiftId', shiftId);
 
-    const res = await fetch(`/api/v1/configs/${encodeURIComponent(tenantId)}/resolve?${params.toString()}`);
+    const res = await fetch(`${API_BASE}/api/v1/configs/${encodeURIComponent(tenantId)}/resolve?${params.toString()}`);
     if (!res.ok) {
       throw new Error(`Backend resolution failed for ${key}`);
     }
@@ -61,7 +63,7 @@ export const api = {
     if (officeId) params.append('officeId', officeId);
     if (shiftId) params.append('shiftId', shiftId);
 
-    const res = await fetch(`/api/v1/configs/${encodeURIComponent(tenantId)}/explain?${params.toString()}`);
+    const res = await fetch(`${API_BASE}/api/v1/configs/${encodeURIComponent(tenantId)}/explain?${params.toString()}`);
     if (!res.ok) {
       throw new Error(`Explain resolution failed for ${key}`);
     }
@@ -114,7 +116,7 @@ export const api = {
 
   // 6. Get full audit history from backend database
   async getHistory(tenantId) {
-    const res = await fetch(`/api/v1/configs/${encodeURIComponent(tenantId)}/history`);
+    const res = await fetch(`${API_BASE}/api/v1/configs/${encodeURIComponent(tenantId)}/history`);
     if (!res.ok) {
       throw new Error(`Failed to load history for ${tenantId} from backend`);
     }
@@ -154,7 +156,7 @@ export const api = {
       })),
     };
 
-    const res = await fetch(`/api/v1/configs/${encodeURIComponent(tenantId)}/changeset`, {
+    const res = await fetch(`${API_BASE}/api/v1/configs/${encodeURIComponent(tenantId)}/changeset`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -183,7 +185,7 @@ export const api = {
       author,
     });
 
-    const res = await fetch(`/api/v1/configs/${encodeURIComponent(tenantId)}/rollback?${params.toString()}`, {
+    const res = await fetch(`${API_BASE}/api/v1/configs/${encodeURIComponent(tenantId)}/rollback?${params.toString()}`, {
       method: 'POST',
     });
 
@@ -205,7 +207,7 @@ export const api = {
 
   // 9. Staged Rollouts (Canary) API
   async listRollouts(tenantId) {
-    const res = await fetch(`/api/v1/configs/${encodeURIComponent(tenantId)}/rollouts`);
+    const res = await fetch(`${API_BASE}/api/v1/configs/${encodeURIComponent(tenantId)}/rollouts`);
     if (!res.ok) return [];
     return await res.json();
   },
@@ -219,7 +221,7 @@ export const api = {
       reason: reason || 'Canary staged rollout',
     });
 
-    const res = await fetch(`/api/v1/configs/${encodeURIComponent(tenantId)}/rollouts?${params.toString()}`, {
+    const res = await fetch(`${API_BASE}/api/v1/configs/${encodeURIComponent(tenantId)}/rollouts?${params.toString()}`, {
       method: 'POST',
     });
 
@@ -236,7 +238,7 @@ export const api = {
       reason: reason || 'Canary promotion to all offices',
     });
 
-    const res = await fetch(`/api/v1/rollouts/${rolloutId}/promote?${params.toString()}`, {
+    const res = await fetch(`${API_BASE}/api/v1/rollouts/${rolloutId}/promote?${params.toString()}`, {
       method: 'POST',
     });
 
@@ -253,7 +255,7 @@ export const api = {
       reason: reason || 'Canary aborted',
     });
 
-    const res = await fetch(`/api/v1/rollouts/${rolloutId}/abort?${params.toString()}`, {
+    const res = await fetch(`${API_BASE}/api/v1/rollouts/${rolloutId}/abort?${params.toString()}`, {
       method: 'POST',
     });
 
@@ -267,7 +269,7 @@ export const api = {
   // 10. Actuator Metrics
   async getMetrics() {
     try {
-      const res = await fetch('/actuator/metrics');
+      const res = await fetch(`${API_BASE}/actuator/metrics`);
       if (res.ok) return await res.json();
     } catch {}
     return null;

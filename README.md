@@ -43,9 +43,8 @@ Ran on **AMD Ryzen 7 / Intel Core i7, Windows 11, OpenJDK 21.0.13**:
 ```
 Move_in_sync/
 ├── pom.xml                               # Maven parent POM (Spring Boot 3.3.5, Java 21)
-├── docker-compose.yml                    # One-command startup (PostgreSQL 16 + Server)
-├── Dockerfile                            # Multi-stage production container build
 ├── DESIGN_NOTE.md                        # Architecture, Sequence Diagram, Failure-Mode Table
+├── frontend/                             # React + Vite Interactive Web Console
 ├── config-client-sdk/                    # Lightweight embeddable client library
 │   ├── src/main/java/.../client/
 │   │   ├── MoveInSyncConfigClient.java   # Public client interface
@@ -69,15 +68,27 @@ Move_in_sync/
 
 ---
 
-## One-Command Run (Docker Compose)
+## Quick Start (Backend & Frontend)
 
-To start the configuration service along with PostgreSQL 16:
+### 1. Start Backend (`config-server`)
+Ensure PostgreSQL is running locally on port `5432` with a database named `moveinsync_config` (or configure via environment variables).
 
 ```bash
-docker compose up --build
-```
+# Windows
+.\mvnw.cmd spring-boot:run -pl config-server
 
-The service will start on port `8080`, automatically connect to PostgreSQL, and initialize standard setting definitions.
+# Linux / macOS
+./mvnw spring-boot:run -pl config-server
+```
+The server will start on port `8090` and auto-initialize schemas.
+
+### 2. Start Frontend (`frontend`)
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Open `http://localhost:3000` to interact with the configuration console.
 
 ---
 
