@@ -21,7 +21,7 @@ public class LiveStreamController {
     }
 
     // Opens an HTTP Server-Sent Events push stream for live configuration propagation.
-    @GetMapping(value = "/configs/{tenantId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @GetMapping(value = {"/{tenantId}", "/configs/{tenantId}"}, produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamTenantConfigs(@PathVariable String tenantId) {
         TenantContext.assertCanAccessTenant(tenantId);
         return broadcaster.registerClient(tenantId);

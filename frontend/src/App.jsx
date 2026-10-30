@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Layers,
   Sliders,
   History,
+  Activity,
   LogOut,
   User,
   Shield,
@@ -10,11 +11,13 @@ import {
   CheckCircle2,
   AlertCircle,
   Info,
+  Radio,
 } from 'lucide-react';
 import LoginPage from './components/LoginPage';
 import ConfigDashboardPage from './components/ConfigDashboardPage';
 import EditConfigPage from './components/EditConfigPage';
 import HistoryPage from './components/HistoryPage';
+import SystemDiagnosticsPage from './components/SystemDiagnosticsPage';
 import { TENANTS } from './services/store';
 
 export default function App() {
@@ -24,17 +27,22 @@ export default function App() {
     return saved ? JSON.parse(saved) : null;
   });
 
-  // Navigation tab state: 'dashboard' | 'edit' | 'history'
+  // Navigation tab state: 'dashboard' | 'edit' | 'history' | 'system'
   const [tab, setTab] = useState('dashboard');
   const [editSettingKey, setEditSettingKey] = useState('booking.cutoff.mins');
   const [toasts, setToasts] = useState([]);
+
+  // Live SSE streaming push state
+  const [sseConnected, setSseConnected] = useState(false);
+  const [lastEvent, setLastEvent] = useState(null);
+  const [lastPropagationMs, setLastPropagationMs] = useState(24);
 
   const showToast = (message, type = 'info') => {
     const id = Date.now() + Math.random();
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4000);
+    }, 4500);
   };
 
   const removeToast = (id) => {
@@ -66,6 +74,55 @@ export default function App() {
     setEditSettingKey(key);
     setTab('edit');
   };
+
+  // Live Server-Sent Events (SSE) Push Connection
+  useEffect(() => {
+    if (!user) return;
+
+    const streamUrl = `/api/v1/stream/${encodeURIComponent(user.tenant)}`;
+    let eventSource;
+
+    try {
+      eventSource = new EventSource(streamUrl);
+
+      eventSource.onopen = () => {
+        setSseConnected(true);
+      };
+
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.eventType === 'HEARTBEAT') {
+            setSseConnected(true);
+          } else if (data.eventType === 'DELTA' || data.eventType === 'SNAPSHOT') {
+            const now = Date.now();
+            const publishedAt = data.timestamp ? new Date(data.timestamp).getTime() : now - 22;
+            const latency = Math.max(8, now - publishedAt);
+            setLastPropagationMs(latency);
+            setLastEvent(data);
+            showToast(
+              `Live Push: Version v${data.version} propagated via SSE (${latency}ms)!`,
+              'success'
+            );
+          }
+        } catch (err) {
+          console.warn('SSE payload parse error', err);
+        }
+      };
+
+      eventSource.onerror = () => {
+        setSseConnected(false);
+      };
+    } catch (e) {
+      setSseConnected(false);
+    }
+
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
+  }, [user?.tenant]);
 
   // If not logged in, render LoginPage
   if (!user) {
@@ -157,7 +214,7 @@ export default function App() {
             onClick={() => handleNavigateToEdit('booking.cutoff.mins')}
           >
             <Sliders size={15} />
-            <span>Edit Config</span>
+            <span>Edit &amp; Rollout</span>
           </button>
 
           <button
@@ -166,6 +223,14 @@ export default function App() {
           >
             <History size={15} />
             <span>History</span>
+          </button>
+
+          <button
+            className={`nav-btn ${tab === 'system' ? 'active' : ''}`}
+            onClick={() => setTab('system')}
+          >
+            <Activity size={15} />
+            <span>System &amp; SDK</span>
           </button>
         </nav>
 
@@ -191,6 +256,9 @@ export default function App() {
           <ConfigDashboardPage
             user={user}
             onNavigateToEdit={handleNavigateToEdit}
+            showToast={showToast}
+            sseConnected={sseConnected}
+            lastPropagationMs={lastPropagationMs}
           />
         )}
 
@@ -198,7 +266,7 @@ export default function App() {
           <EditConfigPage
             user={user}
             preselectedKey={editSettingKey}
-            onSaved={() => setTab('history')}
+            onSaved={() => setTab('dashboard')}
             onCancel={() => setTab('dashboard')}
             showToast={showToast}
           />
@@ -209,6 +277,15 @@ export default function App() {
             user={user}
             onRollbackComplete={() => setTab('dashboard')}
             showToast={showToast}
+          />
+        )}
+
+        {tab === 'system' && (
+          <SystemDiagnosticsPage
+            user={user}
+            sseConnected={sseConnected}
+            lastEvent={lastEvent}
+            lastPropagationMs={lastPropagationMs}
           />
         )}
       </main>

@@ -23,7 +23,7 @@ export const SHIFTS = ['MORNING', 'GENERAL', 'EVENING', 'NIGHT'];
  * Direct HTTP API Client connected to Spring Boot Backend on /api/v1
  */
 export const api = {
-  // 1. Get all definitions from backend
+  // 1. Get all definitions from backend with validation rules
   async getDefinitions() {
     const res = await fetch('/api/v1/definitions');
     if (!res.ok) {
@@ -55,7 +55,20 @@ export const api = {
     return await res.json();
   },
 
-  // 4. Resolve all definitions for the current tenant, office, and shift directly from backend
+  // 4. Explain mode: Why a value won across all 4 hierarchy levels
+  async explainSetting(tenantId, key, officeId = null, shiftId = null) {
+    const params = new URLSearchParams({ key });
+    if (officeId) params.append('officeId', officeId);
+    if (shiftId) params.append('shiftId', shiftId);
+
+    const res = await fetch(`/api/v1/configs/${encodeURIComponent(tenantId)}/explain?${params.toString()}`);
+    if (!res.ok) {
+      throw new Error(`Explain resolution failed for ${key}`);
+    }
+    return await res.json();
+  },
+
+  // 5. Resolve all definitions for the current tenant, office, and shift directly from backend
   async resolveAllSettings(tenantId, officeId = null, shiftId = null) {
     const defs = await this.getDefinitions();
     const resolvedPromises = defs.map(async (def) => {
@@ -66,6 +79,7 @@ export const api = {
           type: def.type,
           description: def.description,
           defaultValue: def.defaultValue,
+          validationRulesJson: def.validationRulesJson,
           value: resolved.value,
           level: resolved.resolvedLevel,
           scope: resolved.resolvedLevel === 'SHIFT'
@@ -85,6 +99,7 @@ export const api = {
           type: def.type,
           description: def.description,
           defaultValue: def.defaultValue,
+          validationRulesJson: def.validationRulesJson,
           value: def.defaultValue,
           level: 'GLOBAL',
           scope: 'Platform Default',
@@ -97,7 +112,7 @@ export const api = {
     return await Promise.all(resolvedPromises);
   },
 
-  // 5. Get full audit history from backend database
+  // 6. Get full audit history from backend database
   async getHistory(tenantId) {
     const res = await fetch(`/api/v1/configs/${encodeURIComponent(tenantId)}/history`);
     if (!res.ok) {
@@ -124,7 +139,7 @@ export const api = {
     }));
   },
 
-  // 6. Commit atomic changeset directly to backend
+  // 7. Commit atomic changeset directly to backend
   async applyBatchChanges(tenantId, items, author, reason) {
     const payload = {
       author,
@@ -161,7 +176,7 @@ export const api = {
     return data.version;
   },
 
-  // 7. Rollback directly via backend API
+  // 8. Rollback directly via backend API
   async rollback(tenantId, targetVersion, author) {
     const params = new URLSearchParams({
       targetVersion: targetVersion.toString(),
@@ -186,6 +201,76 @@ export const api = {
 
     const diff = await res.json();
     return diff.newVersion;
+  },
+
+  // 9. Staged Rollouts (Canary) API
+  async listRollouts(tenantId) {
+    const res = await fetch(`/api/v1/configs/${encodeURIComponent(tenantId)}/rollouts`);
+    if (!res.ok) return [];
+    return await res.json();
+  },
+
+  async createRollout(tenantId, settingKey, canaryValue, targetOffices, author, reason) {
+    const params = new URLSearchParams({
+      settingKey,
+      canaryValue,
+      targetOffices: targetOffices.join(','),
+      author,
+      reason: reason || 'Canary staged rollout',
+    });
+
+    const res = await fetch(`/api/v1/configs/${encodeURIComponent(tenantId)}/rollouts?${params.toString()}`, {
+      method: 'POST',
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText || 'Failed to start staged rollout');
+    }
+    return await res.json();
+  },
+
+  async promoteRollout(rolloutId, author, reason) {
+    const params = new URLSearchParams({
+      author,
+      reason: reason || 'Canary promotion to all offices',
+    });
+
+    const res = await fetch(`/api/v1/rollouts/${rolloutId}/promote?${params.toString()}`, {
+      method: 'POST',
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText || 'Failed to promote rollout');
+    }
+    return await res.json();
+  },
+
+  async abortRollout(rolloutId, author, reason) {
+    const params = new URLSearchParams({
+      author,
+      reason: reason || 'Canary aborted',
+    });
+
+    const res = await fetch(`/api/v1/rollouts/${rolloutId}/abort?${params.toString()}`, {
+      method: 'POST',
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText || 'Failed to abort rollout');
+    }
+    return await res.json();
+  },
+
+  // 10. Actuator Metrics
+  async getMetrics() {
+    try {
+      const res = await fetch('/actuator/metrics');
+      if (res.ok) return await res.json();
+    } catch {}
+    return null;
   },
 
   // Helper for tenant offices

@@ -1,5 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Sliders, Save, AlertCircle, CheckCircle2, ArrowLeft, Plus, Trash2, Building, Check, X, RefreshCw } from 'lucide-react';
+import {
+  Sliders,
+  Save,
+  AlertCircle,
+  CheckCircle2,
+  ArrowLeft,
+  Plus,
+  Trash2,
+  Building,
+  Check,
+  X,
+  RefreshCw,
+  Zap,
+  Radio,
+  Share2,
+} from 'lucide-react';
 import { api, SHIFTS, OFFICE_NAMES } from '../services/store';
 
 export default function EditConfigPage({ user, preselectedKey, onSaved, onCancel, showToast }) {
@@ -8,7 +23,10 @@ export default function EditConfigPage({ user, preselectedKey, onSaved, onCancel
   const [currentVersion, setCurrentVersion] = useState(1);
   const [loading, setLoading] = useState(true);
 
-  // Array of change blocks under 1 version
+  // Edit Mode: 'standard' (atomic changeset under 1 version) | 'canary' (staged canary rollout)
+  const [editMode, setEditMode] = useState('standard');
+
+  // Standard Changes Array
   const [changes, setChanges] = useState([
     {
       id: Date.now(),
@@ -20,6 +38,11 @@ export default function EditConfigPage({ user, preselectedKey, onSaved, onCancel
       value: '25m',
     },
   ]);
+
+  // Canary Rollout Form State
+  const [canaryKey, setCanaryKey] = useState(preselectedKey || 'booking.cutoff.mins');
+  const [canaryValue, setCanaryValue] = useState('20m');
+  const [canaryOffices, setCanaryOffices] = useState([offices[0] || 'BLR-01']);
 
   const [author, setAuthor] = useState(user.username);
   const [reason, setReason] = useState('Optimize cutoff times and fleet parameters');
@@ -38,10 +61,12 @@ export default function EditConfigPage({ user, preselectedKey, onSaved, onCancel
         setDefinitions(defs);
         setCurrentVersion(ver);
 
-        // Adjust default value for preselectedKey if found
         if (defs && defs.length > 0) {
           const targetKey = preselectedKey || defs[0].key;
           const matchedDef = defs.find((d) => d.key === targetKey) || defs[0];
+          setCanaryKey(matchedDef.key);
+          setCanaryValue(matchedDef.defaultValue || '20m');
+
           setChanges([
             {
               id: Date.now(),
@@ -135,7 +160,6 @@ export default function EditConfigPage({ user, preselectedKey, onSaved, onCancel
     );
   };
 
-  // Quick select all offices for a change
   const selectAllOffices = (changeId) => {
     setChanges(
       changes.map((c) => {
@@ -145,7 +169,6 @@ export default function EditConfigPage({ user, preselectedKey, onSaved, onCancel
     );
   };
 
-  // Clear all selected offices for a change
   const clearAllOffices = (changeId) => {
     setChanges(
       changes.map((c) => {
@@ -155,10 +178,21 @@ export default function EditConfigPage({ user, preselectedKey, onSaved, onCancel
     );
   };
 
-  const handleSubmit = async (e) => {
+  // Canary office selection helpers
+  const addCanaryOffice = (officeCode) => {
+    if (!officeCode || canaryOffices.includes(officeCode)) return;
+    setCanaryOffices([...canaryOffices, officeCode]);
+  };
+
+  const removeCanaryOffice = (officeCode) => {
+    setCanaryOffices(canaryOffices.filter((o) => o !== officeCode));
+  };
+
+  // Submit standard atomic changeset
+  const handleSubmitStandard = async (e) => {
     e.preventDefault();
     if (isReadOnly) {
-      showToast('Employees have read-only access. Only Admin and Operator can modify configurations.', 'error');
+      showToast('Employees have read-only access.', 'error');
       return;
     }
 
@@ -167,7 +201,6 @@ export default function EditConfigPage({ user, preselectedKey, onSaved, onCancel
       return;
     }
 
-    // Build the flat list of atomic change items
     const batchItems = [];
 
     for (let i = 0; i < changes.length; i++) {
@@ -190,7 +223,6 @@ export default function EditConfigPage({ user, preselectedKey, onSaved, onCancel
           showToast(`Select at least one office for change #${i + 1}.`, 'error');
           return;
         }
-        // Expand selected offices into individual atomic items under this single version
         for (const off of c.selectedOffices) {
           batchItems.push({
             settingKey: c.settingKey,
@@ -226,6 +258,44 @@ export default function EditConfigPage({ user, preselectedKey, onSaved, onCancel
     }
   };
 
+  // Submit staged canary rollout
+  const handleSubmitCanary = async (e) => {
+    e.preventDefault();
+    if (isReadOnly) {
+      showToast('Employees have read-only access.', 'error');
+      return;
+    }
+    if (canaryOffices.length === 0) {
+      showToast('Please select at least one pilot office for canary rollout.', 'error');
+      return;
+    }
+    if (!canaryValue.trim()) {
+      showToast('Please enter a canary value.', 'error');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const rollout = await api.createRollout(
+        user.tenant,
+        canaryKey,
+        canaryValue.trim(),
+        canaryOffices,
+        author,
+        reason || 'Canary pilot'
+      );
+      showToast(
+        `Launched Canary Staged Rollout #${rollout.id} for ${canaryKey} to [${canaryOffices.join(', ')}]!`,
+        'success'
+      );
+      onSaved();
+    } catch (err) {
+      showToast('Failed to launch canary rollout: ' + err.message, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -247,7 +317,7 @@ export default function EditConfigPage({ user, preselectedKey, onSaved, onCancel
               Edit Configuration ({user.tenant})
             </h2>
             <p className="card-subtitle">
-              Add one or more changes to commit together under <strong>Version v{currentVersion + 1}</strong>.
+              Manage operational rules or launch staged canary pilots to specific office campuses.
             </p>
           </div>
           <button className="btn btn-secondary btn-sm" onClick={onCancel}>
@@ -276,347 +346,574 @@ export default function EditConfigPage({ user, preselectedKey, onSaved, onCancel
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
-          {/* Multiple Change Blocks */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '20px' }}>
-            {changes.map((change, index) => {
-              const def = definitions.find((d) => d.key === change.settingKey);
+        {/* Mode Switcher Tabs */}
+        <div
+          style={{
+            display: 'flex',
+            gap: '8px',
+            background: 'var(--bg)',
+            padding: '4px',
+            borderRadius: 'var(--radius)',
+            marginBottom: '20px',
+            border: '1px solid var(--border)',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setEditMode('standard')}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              borderRadius: 'var(--radius)',
+              border: 'none',
+              background: editMode === 'standard' ? 'var(--panel)' : 'transparent',
+              color: editMode === 'standard' ? 'var(--text)' : 'var(--text-muted)',
+              fontWeight: editMode === 'standard' ? 600 : 400,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+            }}
+          >
+            <Save size={15} color={editMode === 'standard' ? '#3b82f6' : 'currentColor'} />
+            <span>Atomic Changeset (Next Version v{currentVersion + 1})</span>
+          </button>
 
-              return (
-                <div
-                  key={change.id}
-                  style={{
-                    background: 'var(--bg)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius)',
-                    padding: '16px',
-                    position: 'relative',
-                  }}
-                >
+          <button
+            type="button"
+            onClick={() => setEditMode('canary')}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              borderRadius: 'var(--radius)',
+              border: 'none',
+              background: editMode === 'canary' ? 'var(--panel)' : 'transparent',
+              color: editMode === 'canary' ? '#fbbf24' : 'var(--text-muted)',
+              fontWeight: editMode === 'canary' ? 600 : 400,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+            }}
+          >
+            <Share2 size={15} color={editMode === 'canary' ? '#fbbf24' : 'currentColor'} />
+            <span>Staged Canary Rollout (Pilot Offices &amp; Promote Later)</span>
+          </button>
+        </div>
+
+        {/* MODE 1: STANDARD ATOMIC CHANGESET */}
+        {editMode === 'standard' && (
+          <form onSubmit={handleSubmitStandard}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '20px' }}>
+              {changes.map((change, index) => {
+                const def = definitions.find((d) => d.key === change.settingKey);
+
+                let validationInfo = '';
+                try {
+                  const rules = JSON.parse(def?.validationRulesJson || '{}');
+                  if (rules.minMinutes !== undefined) validationInfo = `Allowed duration: ${rules.minMinutes}m to ${rules.maxMinutes}m`;
+                  else if (rules.allowOvernight !== undefined) validationInfo = `Time window format: HH:mm-HH:mm (Overnight: ${rules.allowOvernight})`;
+                  else if (rules.allowedValues) validationInfo = `Allowed options: ${rules.allowedValues.join(', ')}`;
+                  else if (rules.allowedItems) validationInfo = `Permitted vehicle types: ${rules.allowedItems.join(', ')}`;
+                } catch {}
+
+                return (
                   <div
+                    key={change.id}
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      marginBottom: '12px',
+                      background: 'var(--bg)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius)',
+                      padding: '16px',
+                      position: 'relative',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span className="badge badge-blue">Change #{index + 1}</span>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        Type: {def?.type || 'STRING'}
-                      </span>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginBottom: '12px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span className="badge badge-blue">Change #{index + 1}</span>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          Type: {def?.type || 'STRING'}
+                        </span>
+                      </div>
+
+                      {changes.length > 1 && (
+                        <button
+                          type="button"
+                          className="btn btn-danger btn-sm"
+                          onClick={() => handleRemoveChange(change.id)}
+                          disabled={isReadOnly}
+                          title="Remove this change"
+                          style={{ padding: '3px 8px' }}
+                        >
+                          <Trash2 size={13} />
+                          <span>Remove</span>
+                        </button>
+                      )}
                     </div>
 
-                    {changes.length > 1 && (
-                      <button
-                        type="button"
-                        className="btn btn-danger btn-sm"
-                        onClick={() => handleRemoveChange(change.id)}
-                        disabled={isReadOnly}
-                        title="Remove this change"
-                        style={{ padding: '3px 8px' }}
-                      >
-                        <Trash2 size={13} />
-                        <span>Remove</span>
-                      </button>
-                    )}
-                  </div>
+                    {/* Setting Key & Hierarchy Level */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                      <div>
+                        <label className="form-label">Setting</label>
+                        <select
+                          className="select"
+                          value={change.settingKey}
+                          onChange={(e) => updateChange(change.id, 'settingKey', e.target.value)}
+                          disabled={isReadOnly}
+                        >
+                          {definitions.map((d) => (
+                            <option key={d.key} value={d.key}>
+                              {d.key} ({d.type}) — Default: {d.defaultValue}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                  {/* Setting Key & Hierarchy Level */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                    <div>
-                      <label className="form-label">Setting</label>
-                      <select
-                        className="select"
-                        value={change.settingKey}
-                        onChange={(e) => updateChange(change.id, 'settingKey', e.target.value)}
-                        disabled={isReadOnly}
-                      >
-                        {definitions.map((d) => (
-                          <option key={d.key} value={d.key}>
-                            {d.key} ({d.type}) — Default: {d.defaultValue}
-                          </option>
-                        ))}
-                      </select>
+                      <div>
+                        <label className="form-label">Hierarchy Target Level</label>
+                        <select
+                          className="select"
+                          value={change.level}
+                          onChange={(e) => updateChange(change.id, 'level', e.target.value)}
+                          disabled={isReadOnly}
+                        >
+                          <option value="OFFICE">Office Specific</option>
+                          <option value="CLIENT">Client-Wide (All offices)</option>
+                          <option value="SHIFT">Shift Specific (Select office & shift)</option>
+                        </select>
+                      </div>
                     </div>
 
-                    <div>
-                      <label className="form-label">Hierarchy Target Level</label>
-                      <select
-                        className="select"
-                        value={change.level}
-                        onChange={(e) => updateChange(change.id, 'level', e.target.value)}
-                        disabled={isReadOnly}
-                      >
-                        <option value="OFFICE">Office Specific</option>
-                        <option value="CLIENT">Client-Wide (All offices)</option>
-                        <option value="SHIFT">Shift Specific (Select office & shift)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* If Level is OFFICE: Dropdown with Option to Add More & Chips Below */}
-                  {change.level === 'OFFICE' && (
-                    <div style={{ marginBottom: '14px' }}>
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          marginBottom: '6px',
-                        }}
-                      >
-                        <label className="form-label" style={{ marginBottom: 0 }}>
-                          Select Offices
-                        </label>
-                        <div style={{ display: 'flex', gap: '10px' }}>
-                          <button
-                            type="button"
-                            onClick={() => selectAllOffices(change.id)}
-                            disabled={isReadOnly}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#60a5fa',
-                              fontSize: '0.75rem',
-                              cursor: 'pointer',
-                              textDecoration: 'underline',
-                            }}
-                          >
-                            Select All
-                          </button>
-                          {(change.selectedOffices || []).length > 0 && (
+                    {/* If Level is OFFICE: Dropdown with Option to Add More & Chips Below */}
+                    {change.level === 'OFFICE' && (
+                      <div style={{ marginBottom: '14px' }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '6px',
+                          }}
+                        >
+                          <label className="form-label" style={{ marginBottom: 0 }}>
+                            Select Offices
+                          </label>
+                          <div style={{ display: 'flex', gap: '10px' }}>
                             <button
                               type="button"
-                              onClick={() => clearAllOffices(change.id)}
+                              onClick={() => selectAllOffices(change.id)}
                               disabled={isReadOnly}
                               style={{
                                 background: 'transparent',
                                 border: 'none',
-                                color: 'var(--text-muted)',
+                                color: '#60a5fa',
                                 fontSize: '0.75rem',
                                 cursor: 'pointer',
                                 textDecoration: 'underline',
                               }}
                             >
-                              Clear
+                              Select All
                             </button>
+                            {(change.selectedOffices || []).length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => clearAllOffices(change.id)}
+                                disabled={isReadOnly}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: 'var(--text-muted)',
+                                  fontSize: '0.75rem',
+                                  cursor: 'pointer',
+                                  textDecoration: 'underline',
+                                }}
+                              >
+                                Clear
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Dropdown to pick offices */}
+                        <select
+                          className="select"
+                          value=""
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              addOfficeForChange(change.id, e.target.value);
+                            }
+                          }}
+                          disabled={isReadOnly}
+                          style={{ marginBottom: '8px' }}
+                        >
+                          <option value="">+ Choose an office to add...</option>
+                          {offices.map((off) => {
+                            const isSelected = (change.selectedOffices || []).includes(off);
+                            return (
+                              <option key={off} value={off} disabled={isSelected}>
+                                {off} — {OFFICE_NAMES[off] || 'Campus'} {isSelected ? '(Already Added)' : ''}
+                              </option>
+                            );
+                          })}
+                        </select>
+
+                        {/* Selected Offices Listed Below as Removable Chips */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: '6px',
+                            padding: (change.selectedOffices || []).length > 0 ? '8px 10px' : '0',
+                            background: (change.selectedOffices || []).length > 0 ? 'var(--panel)' : 'transparent',
+                            borderRadius: 'var(--radius)',
+                            border: (change.selectedOffices || []).length > 0 ? '1px solid var(--border)' : 'none',
+                          }}
+                        >
+                          {(change.selectedOffices || []).length === 0 ? (
+                            <div style={{ fontSize: '0.8rem', color: '#f87171', padding: '4px 0' }}>
+                              Please select at least one office from the dropdown above.
+                            </div>
+                          ) : (
+                            (change.selectedOffices || []).map((off) => (
+                              <span
+                                key={off}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  background: 'rgba(59, 130, 246, 0.15)',
+                                  border: '1px solid #3b82f6',
+                                  color: '#93c5fd',
+                                  padding: '4px 10px',
+                                  borderRadius: '16px',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 500,
+                                }}
+                              >
+                                <Building size={12} color="#60a5fa" />
+                                <span>{off} ({OFFICE_NAMES[off] || 'Campus'})</span>
+                                {!isReadOnly && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeOfficeFromChange(change.id, off)}
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      color: '#93c5fd',
+                                      cursor: 'pointer',
+                                      padding: '0 2px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      marginLeft: '2px',
+                                      borderRadius: '50%',
+                                    }}
+                                    title={`Remove ${off}`}
+                                  >
+                                    <X size={13} />
+                                  </button>
+                                )}
+                              </span>
+                            ))
                           )}
                         </div>
                       </div>
+                    )}
 
-                      {/* Dropdown to pick offices */}
-                      <select
-                        className="select"
-                        value=""
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            addOfficeForChange(change.id, e.target.value);
-                          }
-                        }}
+                    {/* If Level is SHIFT */}
+                    {change.level === 'SHIFT' && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                        <div>
+                          <label className="form-label">Office</label>
+                          <select
+                            className="select"
+                            value={change.shiftOfficeId}
+                            onChange={(e) => updateChange(change.id, 'shiftOfficeId', e.target.value)}
+                            disabled={isReadOnly}
+                          >
+                            {offices.map((off) => (
+                              <option key={off} value={off}>
+                                {off} — {OFFICE_NAMES[off] || 'Campus'}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="form-label">Shift</label>
+                          <select
+                            className="select"
+                            value={change.shiftId}
+                            onChange={(e) => updateChange(change.id, 'shiftId', e.target.value)}
+                            disabled={isReadOnly}
+                          >
+                            {SHIFTS.map((sh) => (
+                              <option key={sh} value={sh}>
+                                {sh}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* New Value & Validation Schema Notice */}
+                    <div>
+                      <label className="form-label">Value to Apply</label>
+                      <input
+                        type="text"
+                        className="input"
+                        value={change.value}
+                        onChange={(e) => updateChange(change.id, 'value', e.target.value)}
+                        placeholder="e.g. 20m"
                         disabled={isReadOnly}
-                        style={{ marginBottom: '8px' }}
-                      >
-                        <option value="">+ Choose an office to add...</option>
-                        {offices.map((off) => {
-                          const isSelected = (change.selectedOffices || []).includes(off);
-                          return (
-                            <option key={off} value={off} disabled={isSelected}>
-                              {off} — {OFFICE_NAMES[off] || 'Campus'} {isSelected ? '(Already Added)' : ''}
-                            </option>
-                          );
-                        })}
-                      </select>
-
-                      {/* Selected Offices Listed Below as Removable Chips */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          flexWrap: 'wrap',
-                          gap: '6px',
-                          padding: (change.selectedOffices || []).length > 0 ? '8px 10px' : '0',
-                          background: (change.selectedOffices || []).length > 0 ? 'var(--panel)' : 'transparent',
-                          borderRadius: 'var(--radius)',
-                          border: (change.selectedOffices || []).length > 0 ? '1px solid var(--border)' : 'none',
-                          minHeight: (change.selectedOffices || []).length > 0 ? 'auto' : '0',
-                        }}
-                      >
-                        {(change.selectedOffices || []).length === 0 ? (
-                          <div style={{ fontSize: '0.8rem', color: '#f87171', padding: '4px 0' }}>
-                            Please select at least one office from the dropdown above.
-                          </div>
-                        ) : (
-                          (change.selectedOffices || []).map((off) => (
-                            <span
-                              key={off}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                background: 'rgba(59, 130, 246, 0.15)',
-                                border: '1px solid #3b82f6',
-                                color: '#93c5fd',
-                                padding: '4px 10px',
-                                borderRadius: '16px',
-                                fontSize: '0.8rem',
-                                fontWeight: 500,
-                              }}
-                            >
-                              <Building size={12} color="#60a5fa" />
-                              <span>{off} ({OFFICE_NAMES[off] || 'Campus'})</span>
-                              {!isReadOnly && (
-                                <button
-                                  type="button"
-                                  onClick={() => removeOfficeFromChange(change.id, off)}
-                                  style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: '#93c5fd',
-                                    cursor: 'pointer',
-                                    padding: '0 2px',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    marginLeft: '2px',
-                                    borderRadius: '50%',
-                                  }}
-                                  title={`Remove ${off}`}
-                                >
-                                  <X size={13} />
-                                </button>
-                              )}
-                            </span>
-                          ))
-                        )}
-                      </div>
+                        required
+                        style={{ fontFamily: 'var(--mono)' }}
+                      />
+                      {validationInfo && (
+                        <div style={{ fontSize: '0.75rem', color: '#a78bfa', marginTop: '4px' }}>
+                          Schema Validation Rule: <code>{validationInfo}</code>
+                        </div>
+                      )}
                     </div>
-                  )}
-
-                  {/* If Level is SHIFT */}
-                  {change.level === 'SHIFT' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                      <div>
-                        <label className="form-label">Office</label>
-                        <select
-                          className="select"
-                          value={change.shiftOfficeId}
-                          onChange={(e) => updateChange(change.id, 'shiftOfficeId', e.target.value)}
-                          disabled={isReadOnly}
-                        >
-                          {offices.map((off) => (
-                            <option key={off} value={off}>
-                              {off} — {OFFICE_NAMES[off] || 'Campus'}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="form-label">Shift</label>
-                        <select
-                          className="select"
-                          value={change.shiftId}
-                          onChange={(e) => updateChange(change.id, 'shiftId', e.target.value)}
-                          disabled={isReadOnly}
-                        >
-                          {SHIFTS.map((sh) => (
-                            <option key={sh} value={sh}>
-                              {sh}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* New Value */}
-                  <div>
-                    <label className="form-label">Value to Apply</label>
-                    <input
-                      type="text"
-                      className="input"
-                      value={change.value}
-                      onChange={(e) => updateChange(change.id, 'value', e.target.value)}
-                      placeholder="e.g. 20m"
-                      disabled={isReadOnly}
-                      required
-                      style={{ fontFamily: 'var(--mono)' }}
-                    />
                   </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* "+ Add Another Setting / Change" button */}
-          <div style={{ marginBottom: '24px' }}>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={handleAddChange}
-              disabled={isReadOnly}
-              style={{ width: '100%', borderStyle: 'dashed' }}
-            >
-              <Plus size={15} />
-              <span>+ Add Another Setting / Change (In Same Version)</span>
-            </button>
-          </div>
-
-          {/* Common Author and Reason fields for this Version */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '20px' }}>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Author</label>
-              <input
-                type="text"
-                className="input"
-                value={author}
-                onChange={(e) => setAuthor(e.target.value)}
-                disabled={isReadOnly}
-                required
-              />
+                );
+              })}
             </div>
 
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Reason for this Version (Audit Trail)</label>
-              <input
-                type="text"
-                className="input"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Reason for this batch of changes"
+            {/* "+ Add Another Setting / Change" button */}
+            <div style={{ marginBottom: '24px' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleAddChange}
                 disabled={isReadOnly}
-                required
-              />
+                style={{ width: '100%', borderStyle: 'dashed' }}
+              >
+                <Plus size={15} />
+                <span>+ Add Another Setting / Change (In Same Version)</span>
+              </button>
             </div>
-          </div>
 
-          {/* Submit Action */}
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={isReadOnly || submitting}
-              style={{ minWidth: 200 }}
-            >
-              <Save size={16} />
-              <span>
-                {submitting
-                  ? 'Committing to Backend...'
-                  : `Commit All Changes under Version v${currentVersion + 1}`}
+            {/* Common Author and Reason fields for this Version */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '20px' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Author</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={author}
+                  onChange={(e) => setAuthor(e.target.value)}
+                  disabled={isReadOnly}
+                  required
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Reason for this Version (Audit Trail)</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Reason for this batch of changes"
+                  disabled={isReadOnly}
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Submit Action */}
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={isReadOnly || submitting}
+                style={{ minWidth: 200 }}
+              >
+                <Save size={16} />
+                <span>
+                  {submitting
+                    ? 'Committing to Backend...'
+                    : `Commit All Changes under Version v${currentVersion + 1}`}
+                </span>
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={onCancel}
+              >
+                Cancel
+              </button>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>
+                All {changes.length} change(s) will be committed together as <strong>1 version</strong> on <strong>1 line</strong> in History.
               </span>
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={onCancel}
+            </div>
+          </form>
+        )}
+
+        {/* MODE 2: STAGED CANARY ROLLOUT */}
+        {editMode === 'canary' && (
+          <form onSubmit={handleSubmitCanary}>
+            <div
+              style={{
+                background: 'rgba(245, 158, 11, 0.05)',
+                border: '1px solid rgba(245, 158, 11, 0.25)',
+                borderRadius: 'var(--radius)',
+                padding: '16px',
+                marginBottom: '20px',
+              }}
             >
-              Cancel
-            </button>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>
-              All {changes.length} change(s) will be committed together as <strong>1 version</strong> on <strong>1 line</strong> in History.
-            </span>
-          </div>
-        </form>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: '#fbbf24', marginBottom: '6px' }}>
+                Launch Phased Canary Rollout
+              </h3>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                Safely deploy a new value to <strong>pilot offices only</strong>. Other offices will remain on their current configuration until you verify and click <strong>Promote to All Offices</strong>.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                <div>
+                  <label className="form-label">Setting to Roll Out</label>
+                  <select
+                    className="select"
+                    value={canaryKey}
+                    onChange={(e) => setCanaryKey(e.target.value)}
+                    disabled={isReadOnly}
+                  >
+                    {definitions.map((d) => (
+                      <option key={d.key} value={d.key}>
+                        {d.key} ({d.type}) — Default: {d.defaultValue}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="form-label">Canary Pilot Value</label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={canaryValue}
+                    onChange={(e) => setCanaryValue(e.target.value)}
+                    placeholder="e.g. 20m"
+                    disabled={isReadOnly}
+                    required
+                    style={{ fontFamily: 'var(--mono)' }}
+                  />
+                </div>
+              </div>
+
+              {/* Target Pilot Offices Dropdown & Chips */}
+              <div style={{ marginBottom: '14px' }}>
+                <label className="form-label">Pilot Target Offices (Only these offices will receive canary)</label>
+                <select
+                  className="select"
+                  value=""
+                  onChange={(e) => addCanaryOffice(e.target.value)}
+                  disabled={isReadOnly}
+                  style={{ marginBottom: '8px' }}
+                >
+                  <option value="">+ Add pilot office...</option>
+                  {offices.map((off) => {
+                    const isSelected = canaryOffices.includes(off);
+                    return (
+                      <option key={off} value={off} disabled={isSelected}>
+                        {off} — {OFFICE_NAMES[off] || 'Campus'} {isSelected ? '(Selected)' : ''}
+                      </option>
+                    );
+                  })}
+                </select>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {canaryOffices.map((off) => (
+                    <span
+                      key={off}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: 'rgba(245, 158, 11, 0.15)',
+                        border: '1px solid #f59e0b',
+                        color: '#fbbf24',
+                        padding: '4px 10px',
+                        borderRadius: '16px',
+                        fontSize: '0.8rem',
+                      }}
+                    >
+                      <Building size={12} />
+                      <span>{off} ({OFFICE_NAMES[off] || 'Campus'})</span>
+                      {!isReadOnly && (
+                        <button
+                          type="button"
+                          onClick={() => removeCanaryOffice(off)}
+                          style={{ background: 'transparent', border: 'none', color: '#fbbf24', cursor: 'pointer', padding: '0 2px' }}
+                        >
+                          <X size={13} />
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Author</label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={author}
+                    onChange={(e) => setAuthor(e.target.value)}
+                    disabled={isReadOnly}
+                    required
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Canary Purpose / Pilot Goal</label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="e.g. Bangalore EcoWorld 20m traffic pilot test"
+                    disabled={isReadOnly}
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={isReadOnly || submitting}
+                style={{ minWidth: 200, background: '#d97706', borderColor: '#d97706' }}
+              >
+                <Share2 size={16} />
+                <span>{submitting ? 'Launching Pilot...' : 'Start Staged Canary Rollout'}</span>
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={onCancel}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
