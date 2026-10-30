@@ -10,7 +10,6 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.nio.file.Path;
 import java.time.Duration;
