@@ -1,0 +1,7 @@
+.git
+.vscode
+target/
+config-server/target/
+config-client-sdk/target/
+frontend/
+*.log
