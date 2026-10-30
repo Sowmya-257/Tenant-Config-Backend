@@ -1,7 +1,6 @@
 package com.moveinsync.config.server;
 
 import com.moveinsync.config.client.DefaultMoveInSyncConfigClient;
-import com.moveinsync.config.client.MoveInSyncConfigClient;
 import com.moveinsync.config.client.model.*;
 import com.moveinsync.config.client.storage.DiskSnapshotStore;
 import com.moveinsync.config.client.storage.SnapshotMemoryStore;
@@ -16,7 +15,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

@@ -10,7 +10,6 @@ import com.moveinsync.config.server.dto.ChangeSetItemRequest;
 import com.moveinsync.config.server.dto.ChangeSetRequest;
 import com.moveinsync.config.server.dto.ChangeSetResponse;
 import com.moveinsync.config.server.dto.RollbackDiffResponse;
-import com.moveinsync.config.server.exception.ResourceNotFoundException;
 import com.moveinsync.config.server.repository.ChangeSetRepository;
 import com.moveinsync.config.server.repository.SettingOverrideRepository;
 import com.moveinsync.config.server.repository.TenantVersionRepository;
