@@ -5,13 +5,10 @@ import {
   History,
   Activity,
   LogOut,
-  User,
-  Shield,
   X,
   CheckCircle2,
   AlertCircle,
   Info,
-  Radio,
 } from 'lucide-react';
 import LoginPage from './components/LoginPage';
 import ConfigDashboardPage from './components/ConfigDashboardPage';

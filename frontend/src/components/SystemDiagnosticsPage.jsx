@@ -1,19 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
   Activity,
-  Server,
   Zap,
   HardDrive,
-  ShieldCheck,
-  CheckCircle2,
-  Clock,
   Radio,
   RefreshCw,
-  AlertTriangle,
-  FileText,
-  TrendingUp,
   Cpu,
-  Layers,
 } from 'lucide-react';
 import { api } from '../services/store';
 

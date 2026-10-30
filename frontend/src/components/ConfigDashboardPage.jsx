@@ -2,19 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
   Layers,
   Sliders,
-  CheckCircle2,
-  Building,
-  Clock,
-  ArrowRight,
   RefreshCw,
   AlertCircle,
   HelpCircle,
-  ShieldCheck,
-  Radio,
-  Zap,
-  Check,
   X,
-  Play,
   Share2,
 } from 'lucide-react';
 import { api, SHIFTS, OFFICE_NAMES } from '../services/store';

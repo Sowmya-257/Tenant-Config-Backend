@@ -3,16 +3,12 @@ import {
   Sliders,
   Save,
   AlertCircle,
-  CheckCircle2,
   ArrowLeft,
   Plus,
   Trash2,
   Building,
-  Check,
   X,
   RefreshCw,
-  Zap,
-  Radio,
   Share2,
 } from 'lucide-react';
 import { api, SHIFTS, OFFICE_NAMES } from '../services/store';

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { History, RotateCcw, CheckCircle2, Clock, RefreshCw, AlertCircle } from 'lucide-react';
+import { History, RotateCcw, RefreshCw, AlertCircle } from 'lucide-react';
 import { api } from '../services/store';
 
 export default function HistoryPage({ user, onRollbackComplete, showToast }) {

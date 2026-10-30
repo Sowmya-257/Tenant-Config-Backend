@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, User, Building, LogIn, Lock } from 'lucide-react';
+import { Shield, LogIn } from 'lucide-react';
 import { TENANTS } from '../services/store';
 
 export default function LoginPage({ onLogin }) {
