@@ -41,8 +41,6 @@ class PropagationAndScaleBenchmarkTest {
         // Create 200 simulated clients each having its own in-memory store and SSE push channel
         List<SnapshotMemoryStore> clientStores = new ArrayList<>(clientCount);
         CountDownLatch updateLatch = new CountDownLatch(clientCount);
-        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper()
-                .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
 
         for (int i = 0; i < clientCount; i++) {
             TenantConfigSnapshot initial = new TenantConfigSnapshot(
@@ -51,26 +49,6 @@ class PropagationAndScaleBenchmarkTest {
             SnapshotMemoryStore store = new SnapshotMemoryStore(tenantId, initial);
             clientStores.add(store);
 
-            // Create customized SseEmitter to intercept delivery
-            SseEmitter emitter = new SseEmitter(60_000L) {
-                @Override
-                public synchronized void send(SseEventBuilder builder) {
-                    try {
-                        // Deliver event to simulated client
-                        Set<?> dataSet = builder.build();
-                        for (Object part : dataSet) {
-                            String str = part.toString();
-                            if (str.contains("\"eventType\":\"DELTA\"")) {
-                                ConfigChangeEvent ev = mapper.readValue(str.substring(str.indexOf("{")), ConfigChangeEvent.class);
-                                if (ev.getDelta() != null) {
-                                    store.applyDelta(ev.getDelta());
-                                    updateLatch.countDown();
-                                }
-                            }
-                        }
-                    } catch (Exception ignored) {}
-                }
-            };
             broadcaster.registerClient(tenantId);
         }
 
