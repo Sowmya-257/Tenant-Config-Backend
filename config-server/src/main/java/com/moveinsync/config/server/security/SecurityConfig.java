@@ -37,7 +37,9 @@ public class SecurityConfig {
                                 "/api/v1/auth/**",
                                 "/api/v1/stream/**",
                                 "/api/v1/sync/**",
-                                "/api/v1/configs/**"
+                                "/api/v1/configs/**",
+                                "/api/v1/definitions/**",
+                                "/api/v1/rollouts/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

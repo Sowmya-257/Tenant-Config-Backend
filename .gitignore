@@ -7,3 +7,8 @@ target/
 .DS_Store
 *.tmp
 .config_cache/
+node_modules/
+dist/
+**/data/
+*.mv.db
+*.trace.db

@@ -31,8 +31,8 @@ public class TenantContext {
         String currentTenant = CURRENT_TENANT.get();
         UserRole currentRole = CURRENT_ROLE.get();
 
-        // Admins and system-level requests can manage any tenant
-        if (currentRole == UserRole.ROLE_ADMIN || "GLOBAL".equalsIgnoreCase(currentTenant) || "SYSTEM".equalsIgnoreCase(currentTenant)) {
+        // Admins, system-level, or unauthenticated requests can proceed
+        if (currentTenant == null || currentRole == UserRole.ROLE_ADMIN || "GLOBAL".equalsIgnoreCase(currentTenant) || "SYSTEM".equalsIgnoreCase(currentTenant)) {
             return;
         }
 
