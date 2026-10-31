@@ -34,7 +34,7 @@ public class StagedRolloutController {
                                                        @RequestParam List<String> targetOffices,
                                                        @RequestParam String author,
                                                        @RequestParam(defaultValue = "Canary staged rollout") String reason) {
-        TenantContext.assertCanAccessTenant(tenantId);
+        TenantContext.assertCanModifyTenant(tenantId);
         StagedRollout rollout = rolloutService.createRollout(tenantId, settingKey, canaryValue, targetOffices, author, reason);
         return ResponseEntity.status(HttpStatus.CREATED).body(rollout);
     }
@@ -44,6 +44,7 @@ public class StagedRolloutController {
     public ResponseEntity<StagedRollout> promoteRollout(@PathVariable Long rolloutId,
                                                         @RequestParam String author,
                                                         @RequestParam(defaultValue = "Canary promotion") String reason) {
+        rolloutRepository.findById(rolloutId).ifPresent(r -> TenantContext.assertCanModifyTenant(r.getTenantId()));
         StagedRollout promoted = rolloutService.promoteRollout(rolloutId, author, reason);
         return ResponseEntity.ok(promoted);
     }
@@ -53,6 +54,7 @@ public class StagedRolloutController {
     public ResponseEntity<StagedRollout> abortRollout(@PathVariable Long rolloutId,
                                                       @RequestParam String author,
                                                       @RequestParam(defaultValue = "Canary abortion") String reason) {
+        rolloutRepository.findById(rolloutId).ifPresent(r -> TenantContext.assertCanModifyTenant(r.getTenantId()));
         StagedRollout aborted = rolloutService.abortRollout(rolloutId, author, reason);
         return ResponseEntity.ok(aborted);
     }

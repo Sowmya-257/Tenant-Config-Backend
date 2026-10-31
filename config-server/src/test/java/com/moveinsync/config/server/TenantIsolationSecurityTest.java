@@ -45,4 +45,35 @@ class TenantIsolationSecurityTest {
         assertThatCode(() -> TenantContext.assertCanAccessTenant("CLIENT_B"))
                 .doesNotThrowAnyException();
     }
+
+    @Test
+    @DisplayName("Employee role is strictly read-only and cannot mutate configurations")
+    void testEmployeeCannotModifyConfigurations() {
+        TenantContext.set("CLIENT_A", UserRole.ROLE_EMPLOYEE);
+
+        // Employee can read own tenant
+        assertThatCode(() -> TenantContext.assertCanAccessTenant("CLIENT_A"))
+                .doesNotThrowAnyException();
+
+        // Employee is blocked from mutating configurations
+        assertThatThrownBy(() -> TenantContext.assertCanModifyTenant("CLIENT_A"))
+                .isInstanceOf(TenantAccessDeniedException.class)
+                .hasMessageContaining("read-only");
+    }
+
+    @Test
+    @DisplayName("Operator and Admin can modify configurations for authorized tenants")
+    void testOperatorAndAdminCanModifyConfigurations() {
+        // Operator can modify own tenant
+        TenantContext.set("CLIENT_A", UserRole.ROLE_OPERATOR);
+        assertThatCode(() -> TenantContext.assertCanModifyTenant("CLIENT_A"))
+                .doesNotThrowAnyException();
+
+        // Admin can modify any tenant
+        TenantContext.set("SYSTEM", UserRole.ROLE_ADMIN);
+        assertThatCode(() -> TenantContext.assertCanModifyTenant("CLIENT_A"))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> TenantContext.assertCanModifyTenant("CLIENT_B"))
+                .doesNotThrowAnyException();
+    }
 }

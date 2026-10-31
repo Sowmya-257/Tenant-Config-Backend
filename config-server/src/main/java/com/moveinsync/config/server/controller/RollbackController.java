@@ -26,7 +26,7 @@ public class RollbackController {
                                                          @RequestParam Long targetVersion,
                                                          @RequestParam(defaultValue = "admin_rollback") String author,
                                                          @RequestParam(required = false) String reason) {
-        TenantContext.assertCanAccessTenant(tenantId);
+        TenantContext.assertCanModifyTenant(tenantId);
         RollbackDiffResponse diff = rollbackService.rollbackToVersion(tenantId, targetVersion, author, reason);
         return ResponseEntity.ok(diff);
     }

@@ -34,7 +34,7 @@ public class ChangeSetController {
     @PostMapping("/changeset")
     public ResponseEntity<ChangeSetResponse> applyChangeSet(@PathVariable String tenantId,
                                                             @Valid @RequestBody ChangeSetRequest request) {
-        TenantContext.assertCanAccessTenant(tenantId);
+        TenantContext.assertCanModifyTenant(tenantId);
         ChangeSetResponse response = changeSetService.applyChangeSet(tenantId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

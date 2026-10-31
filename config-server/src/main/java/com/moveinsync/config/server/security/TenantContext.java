@@ -45,6 +45,15 @@ public class TenantContext {
                 currentTenant + "' cannot access tenant '" + targetTenantId + "'");
     }
 
+    // Enforces role-based write permissions: Employees are strictly read-only
+    public static void assertCanModifyTenant(String targetTenantId) {
+        assertCanAccessTenant(targetTenantId);
+        UserRole currentRole = CURRENT_ROLE.get();
+        if (currentRole == UserRole.ROLE_EMPLOYEE) {
+            throw new TenantAccessDeniedException("Role 'ROLE_EMPLOYEE' is read-only. Modifying configurations, rollouts, or rollbacks is forbidden.");
+        }
+    }
+
     // Clears the thread-local state to prevent context leakage across thread pools.
     public static void clear() {
         CURRENT_TENANT.remove();
