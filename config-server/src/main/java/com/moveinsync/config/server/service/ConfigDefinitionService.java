@@ -66,7 +66,7 @@ public class ConfigDefinitionService implements CommandLineRunner {
             saveOrUpdate(new SettingDefinition(
                     "cab.types.allowed", SettingType.LIST,
                     "Allowed vehicle categories for employee transportation", "SEDAN,SUV,HATCHBACK,ELECTRIC_EV",
-                    "{\"allowedItems\": [\"SEDAN\", \"SUV\", \"HATCHBACK\", \"ELECTRIC_EV\", \"MINIVAN\"]}"
+                    "{\"allowedItems\": [\"SEDAN\", \"SUV\", \"HATCHBACK\", \"ELECTRIC_EV\", \"MINIVAN\", \"SWIFT\"]}"
             ));
             saveOrUpdate(new SettingDefinition(
                     "vendor.assignment.strategy", SettingType.ENUM,
@@ -75,6 +75,15 @@ public class ConfigDefinitionService implements CommandLineRunner {
             ));
             log.info("Finished seeding {} setting definitions.", definitionRepository.count());
         }
+
+        // Ensure cab.types.allowed includes SWIFT even if database was seeded in a prior run
+        definitionRepository.findById("cab.types.allowed").ifPresent(def -> {
+            if (def.getValidationRulesJson() != null && !def.getValidationRulesJson().contains("SWIFT")) {
+                def.setValidationRulesJson("{\"allowedItems\": [\"SEDAN\", \"SUV\", \"HATCHBACK\", \"ELECTRIC_EV\", \"MINIVAN\", \"SWIFT\"]}");
+                definitionRepository.save(def);
+                log.info("Updated cab.types.allowed validation rules to include SWIFT");
+            }
+        });
 
         // Seed initial company tenant overrides if empty
         if (versionRepository.count() == 0) {
