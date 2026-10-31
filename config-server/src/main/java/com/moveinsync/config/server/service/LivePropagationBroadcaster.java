@@ -29,7 +29,9 @@ public class LivePropagationBroadcaster {
     private static final Logger log = LoggerFactory.getLogger(LivePropagationBroadcaster.class);
 
     private final Map<String, List<SseEmitter>> tenantEmitters = new ConcurrentHashMap<>();
-    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     private final AtomicInteger activeConnectionsCount = new AtomicInteger(0);
 
     // Injects meter registry to record active connection gauge for on-call visibility.

@@ -21,6 +21,7 @@ public class ConfigChangeEvent {
     private final Long version;
     private final ConfigDelta delta;
     private final TenantConfigSnapshot snapshot;
+    @com.fasterxml.jackson.annotation.JsonFormat(shape = com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING)
     private final Instant timestamp;
 
     // Constructs a live push notification event.
@@ -82,5 +83,10 @@ public class ConfigChangeEvent {
     // Returns the emission timestamp of this event.
     public Instant getTimestamp() {
         return timestamp;
+    }
+
+    // Returns the emission timestamp in milliseconds since epoch.
+    public long getTimestampEpochMs() {
+        return timestamp != null ? timestamp.toEpochMilli() : System.currentTimeMillis();
     }
 }
